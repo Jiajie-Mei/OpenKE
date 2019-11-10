@@ -55,4 +55,6 @@ class TransE(Model):
 		predict_h_e = tf.nn.embedding_lookup(self.ent_embeddings, predict_h)
 		predict_t_e = tf.nn.embedding_lookup(self.ent_embeddings, predict_t)
 		predict_r_e = tf.nn.embedding_lookup(self.rel_embeddings, predict_r)
-		self.predict = tf.reduce_mean(self._calc(predict_h_e, predict_t_e, predict_r_e), 1, keep_dims = False)
+		score = self._calc(predict_h_e, predict_t_e, predict_r_e)  # the lower, the better
+		self.max_k_score = -tf.reduce_sum(score, 1, keep_dims=False)  # the higher, the better
+		self.predict = tf.reduce_mean(score, 1, keep_dims = False)

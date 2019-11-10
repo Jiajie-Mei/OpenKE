@@ -6,6 +6,9 @@ import time
 import datetime
 import ctypes
 import json
+import pickle
+from collections import defaultdict
+
 
 class Config(object):
 	'''
@@ -277,7 +280,9 @@ class Config(object):
 		self.model = model
 		self.graph = tf.Graph()
 		with self.graph.as_default():
-			self.sess = tf.Session()
+			config = tf.ConfigProto()
+			config.gpu_options.allow_growth = True
+			self.sess = tf.Session(config=config)
 			with self.sess.as_default():
 				initializer = tf.contrib.layers.xavier_initializer(uniform = True)
 				with tf.variable_scope("model", reuse=None, initializer = initializer):
@@ -315,6 +320,15 @@ class Config(object):
 		}
 		predict = self.sess.run(self.trainModel.predict, feed_dict)
 		return predict
+
+	def obtain_score(self, test_h, test_t, test_r):
+		feed_dict = {
+			self.trainModel.predict_h: test_h,
+			self.trainModel.predict_t: test_t,
+			self.trainModel.predict_r: test_r,
+		}
+		score = self.sess.run(self.trainModel.max_k_score, feed_dict)
+		return score
 
 	def run(self):
 		with self.graph.as_default():
@@ -356,17 +370,81 @@ class Config(object):
 				if self.importName != None:
 					self.restore_tensorflow()
 				if self.test_link_prediction:
+					# dump for max_k
+					field_h = 'h'
+					field_r = 'r'
+					field_probs = 'probs'
+					path_max_k_probs = 'max_k_probs'
+					batch_size = 256
+					dict_condition2score = dict()
+
 					total = self.lib.getTestTotal()
 					for times in range(total):
 						self.lib.getHeadBatch(self.test_h_addr, self.test_t_addr, self.test_r_addr)
 						res = self.test_step(self.test_h, self.test_t, self.test_r)
+
+						# dump for max-k
+						max_k_score_head = self.obtain_score(self.test_h, self.test_t, self.test_r)
+						tail = self.test_t[0]
+						relation_inverse = self.test_r[0] + self.relTotal
+						condition = (tail, relation_inverse)
+						if condition not in dict_condition2score:
+							dict_condition2score[condition] = max_k_score_head  # [num_ent]
+
 						self.lib.testHead(res.__array_interface__['data'][0])
 
 						self.lib.getTailBatch(self.test_h_addr, self.test_t_addr, self.test_r_addr)
 						res = self.test_step(self.test_h, self.test_t, self.test_r)
+
+						# dump for max-k
+						max_k_score_tail = self.obtain_score(self.test_h, self.test_t, self.test_r)
+						head = self.test_h[0]
+						relation = self.test_r[0]
+						condition = (head, relation)
+						if condition not in dict_condition2score:
+							dict_condition2score[condition] = max_k_score_tail  # [num_ent]
+
 						self.lib.testTail(res.__array_interface__['data'][0])
 						if self.log_on:
 							print(times)
+
+					# dump for max-k
+					print('start dumping for max-k')
+					if not os.path.exists(path_max_k_probs):
+						os.makedirs(path_max_k_probs)
+
+					list_heads = []
+					list_relations = []
+					list_scores = []
+					index_batch = 0
+					for (head, relation), score in dict_condition2score.items():
+						list_heads.append(head)
+						list_relations.append(relation)
+						list_scores.append(score)
+
+						if len(list_heads) == batch_size:
+							with open(os.path.join(path_max_k_probs, 'batch_%05d.pkl' % index_batch), 'wb') as f:
+								result = {
+									field_h: np.array(list_heads, np.int32, copy=False),
+									field_r: np.array(list_relations, np.int32, copy=False),
+									field_probs: np.array(list_scores, np.float32, copy=False)
+								}
+								pickle.dump(result, f)
+							del result, list_heads, list_relations, list_scores
+							list_heads = []
+							list_relations = []
+							list_scores = []
+							index_batch += 1
+					if len(list_heads) > 0:
+						with open(os.path.join(path_max_k_probs, 'batch_%05d.pkl' % index_batch), 'wb') as f:
+							result = {
+								field_h: np.array(list_heads, np.int32, copy=False),
+								field_r: np.array(list_relations, np.int32, copy=False),
+								field_probs: np.array(list_scores, np.float32, copy=False)
+							}
+							pickle.dump(result, f)
+					print('finished dumping max-k, %d keys' % len(dict_condition2score))
+
 					self.lib.test_link_prediction()
 				if self.test_triple_classification:
 					self.lib.getValidBatch(self.valid_pos_h_addr, self.valid_pos_t_addr, self.valid_pos_r_addr, self.valid_neg_h_addr, self.valid_neg_t_addr, self.valid_neg_r_addr)
