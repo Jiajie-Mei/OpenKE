@@ -19,6 +19,8 @@ class HolE(Model):
 	def _calc(self, head, tail, rel):
 		relation_mention = tf.nn.l2_normalize(rel, 1)
 		entity_mention = self._ccorr(head, tail)
+
+		# the lower, the better
 		return -tf.sigmoid(tf.reduce_sum(relation_mention * entity_mention, 1, keep_dims = True))
 
 	def embedding_def(self):
@@ -46,7 +48,7 @@ class HolE(Model):
 		neg_t_e = tf.reshape(tf.nn.embedding_lookup(self.ent_embeddings, neg_t), [-1, config.hidden_size])
 		neg_r_e = tf.reshape(tf.nn.embedding_lookup(self.rel_embeddings, neg_r), [-1, config.hidden_size])
 		#Calculating score functions for all positive triples and negative triples 
-		#The shape of _p_score is (batch_size, 1, 1)
+		#The shape of _p_score is (batch_size, 1)
 		#The shape of _n_score is (batch_size, negative_ent + negative_rel, 1)
 		_p_score = tf.reshape(self._calc(pos_h_e, pos_t_e, pos_r_e), [-1, 1])
 		_n_score = tf.reshape(self._calc(neg_h_e, neg_t_e, neg_r_e), [-1, config.negative_rel + config.negative_ent])
@@ -64,3 +66,4 @@ class HolE(Model):
 		predict_t_e = tf.nn.embedding_lookup(self.ent_embeddings, predict_t)
 		predict_r_e = tf.nn.embedding_lookup(self.rel_embeddings, predict_r)
 		self.predict = tf.reduce_sum(self._calc(predict_h_e, predict_t_e, predict_r_e), 1, keep_dims = True)
+		self.max_k_score = -self.predict

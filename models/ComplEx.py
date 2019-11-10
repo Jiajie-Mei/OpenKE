@@ -63,5 +63,7 @@ class ComplEx(Model):
 		predict_h_e2 = tf.nn.embedding_lookup(self.ent2_embeddings, predict_h)
 		predict_t_e2 = tf.nn.embedding_lookup(self.ent2_embeddings, predict_t)
 		predict_r_e2 = tf.nn.embedding_lookup(self.rel2_embeddings, predict_r)
-		self.predict = -self._calc(predict_h_e1, predict_h_e2, predict_t_e1, predict_t_e2, predict_r_e1, predict_r_e2)
+		score = self._calc(predict_h_e1, predict_h_e2, predict_t_e1, predict_t_e2, predict_r_e1, predict_r_e2)
+		self.predict = -score
+		self.max_k_score = score
 

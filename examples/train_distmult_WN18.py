@@ -1,3 +1,7 @@
+import sys
+path_dataset = sys.argv[1]
+
+
 import config
 import models
 import tensorflow as tf
@@ -5,7 +9,7 @@ import numpy as np
 
 con = config.Config()
 #Input training files from benchmarks/FB15K/ folder.
-con.set_in_path("./benchmarks/WN18RR/")
+con.set_in_path(path_dataset)
 #True: Input test files from the same folder.
 con.set_test_link_prediction(True)
 # con.set_test_triple_classification(True)

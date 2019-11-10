@@ -1,3 +1,7 @@
+import sys
+path_dataset = sys.argv[1]
+
+
 import config
 import models
 import tensorflow as tf
@@ -7,7 +11,7 @@ os.environ['CUDA_VISIBLE_DEVICES']='0'
 #Input training files from benchmarks/FB15K/ folder.
 con = config.Config()
 #True: Input test files from the same folder.
-con.set_in_path("./benchmarks/WN18RR/")
+con.set_in_path(path_dataset)
 con.set_test_link_prediction(True)
 # con.set_test_triple_classification(True)
 con.set_work_threads(8)
