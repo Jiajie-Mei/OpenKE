@@ -7,6 +7,8 @@ for dataset in 'FB15K WN18 FB15K-237 WN18RR'.split():
             results = [model]
 
             logs = [line.strip() for line in open('../%s_%s/log.txt' % (dataset, model), 'r') if line.strip()]
+            job_id = '0:'
+            logs = [line[line.find(job_id) + len(job_id):].strip() if line.startswith(job_id) else line for line in logs]
             start = logs.index('no type constraint results:')
             end = logs.index('type constraint results:')
             logs = logs[start: end]
